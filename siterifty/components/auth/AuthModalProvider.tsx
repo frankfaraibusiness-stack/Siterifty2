@@ -7,7 +7,13 @@ import AuthModal from "@/components/auth/AuthModal";
 type AuthModalTab = "login" | "signup";
 
 interface AuthModalContextValue {
-  openAuthModal: (tab?: AuthModalTab) => void;
+  // Accepts `unknown` rather than just `AuthModalTab | undefined` because
+  // this function is used two ways: called directly with a tab
+  // ("signup"/"login") from code that wants a specific tab, AND passed
+  // as-is to onClick={openAuthModal} in older call sites, where React
+  // invokes it with a MouseEvent instead. The implementation below
+  // narrows and validates whatever comes in.
+  openAuthModal: (tab?: unknown) => void;
 }
 
 const AuthModalContext = createContext<AuthModalContextValue>({
@@ -30,7 +36,15 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     <AuthModalContext.Provider
       value={{
         openAuthModal: (tab) => {
-          setInitialTab(tab || "login");
+          // openAuthModal is still passed directly as onClick={openAuthModal}
+          // in a couple of older call sites (SignInRequired,
+          // SellerProfileClient) — React calls those handlers with the
+          // MouseEvent as the first argument, not a tab string. Only
+          // "login"/"signup" are treated as an explicit tab request;
+          // anything else (a MouseEvent, undefined) falls back to
+          // "login", same as calling openAuthModal() with no args always
+          // did before initialTab existed.
+          setInitialTab(tab === "login" || tab === "signup" ? tab : "login");
           setOpen(true);
         },
       }}
